@@ -1,0 +1,28 @@
+{
+  "project_id": "4b9ae5ea-6129-4533-a2eb-472461626bf3",
+  "project_name": "LicenseGuard",
+  "project_slug": "adaa1865939a",
+  "team_id": "488a02b5-c546-4242-95fb-bf6caf038fa1",
+  "team_key": "M2A",
+  "meta_issue_id": "M2A-389",
+  "total_issues": 3,
+  "initialized": true,
+  "created_at": "2026-03-26T11:08:44Z",
+  "issues": [
+    {
+      "id": "f09a2efa-2b5a-473d-b04a-b44a06790ea5",
+      "identifier": "M2A-386",
+      "title": "Feature 1 - Dependency License Extraction"
+    },
+    {
+      "id": "3aab23b5-097d-472c-98b5-0d0f4e9c8b90",
+      "identifier": "M2A-387",
+      "title": "Feature 2 - Policy Loading and Evaluation"
+    },
+    {
+      "id": "95fce09b-8626-4c9c-9914-cf898a9ef659",
+      "identifier": "M2A-388",
+      "title": "Feature 3 - Reporting and Exit Code"
+    }
+  ]
+}
