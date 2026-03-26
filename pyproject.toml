@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "licenseguard"
+version = "0.1.0"
+description = "A CLI tool to scan npm dependencies and verify license compliance"
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [
+    {name = "LicenseGuard Team"}
+]
+dependencies = [
+    "click>=8.0.0",
+    "colorama>=0.4.0",
+    "pydantic>=2.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+]
+
+[project.scripts]
+licenseguard = "licenseguard.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["licenseguard*"]

@@ -1,0 +1,191 @@
+
+
+# LicenseGuard - App Specification
+
+## Overview
+LicenseGuard is a command‑line tool that scans the installed dependencies of a JavaScript/npm project and verifies that each package’s license complies with a user‑defined policy. It is intended to be run in CI pipelines or locally before committing changes, preventing problematic licenses from entering the codebase. The tool works entirely offline by inspecting the existing `node_modules` folder, requiring no network calls or external services.
+
+**Problem Statement**: Teams discover license violations late because checking each npm package’s license manually is impractical at scale.  
+**Target Audience**: Legal/compliance teams and senior engineers at B2B SaaS companies, enterprises, or any organization that ships commercial software built on npm.
+
+## Tech Stack
+- Python 3.11+
+- `click` – minimal CLI framework
+- `colorama` – optional colored terminal output (fallback to plain text)
+- `pytest` – testing framework
+
+## Environment Setup
+
+### Prerequisites
+- Python 3.11+ installed
+- Access to `pip` to install dependencies
+
+### Configuration
+| Environment Variable | Description | Default |
+|----------------------|-------------|---------|
+| `LICENSEGUARD_POLICY` | Path to a JSON policy file (see Policy format below) | `.licenseguardrc` in the current directory |
+| `LICENSEGUARD_NO_COLOR` | Disable colored output | `false` |
+
+## Architecture
+```
++-------------------+
+|   licenseguard    |
+|   (CLI entry)     |
++----------+--------+
+           |
+           v
++-------------------+
+|  Dependency       |
+|  Scanner          |
++----------+--------+
+           |
+           v
++-------------------+
+|  Policy Loader    |
++----------+--------+
+           |
+           v
++-------------------+
+|  License Evaluator|
++----------+--------+
+           |
+           v
++-------------------+
+|  Reporter & Exit |
++-------------------+
+```
+
+## Core Features
+
+### Feature 1: Dependency License Extraction
+**Description**: Walk the `node_modules` directory, read each package’s `package.json`, and collect the package name, version, and declared license (SPDX identifier or custom string).
+
+**Requirements**:
+- Accept a path to a project directory (default: current working directory).
+- Skip duplicate packages (same name and version) to avoid double‑checking.
+- Handle missing or malformed `license` fields by marking the license as `"UNKNOWN"`.
+
+**Test Steps**:
+1. `licenseguard scan --path ./sample-project`  
+   Expected output (JSON lines, one per dependency):  
+   ```json
+   {"name":"left-pad","version":"1.3.0","license":"MIT"}
+   {"name":"jsdom","version":"20.0.0","license":"MIT"}
+   ```
+
+### Feature 2: Policy Loading and Evaluation
+**Description**: Load a JSON policy file that lists allowed licenses (optional) and denied licenses (optional). Evaluate each dependency’s license against the policy; a dependency passes if it is not denied and (if an allow list is provided) is allowed.
+
+**Requirements**:
+- Policy file format:  
+  ```json
+  {
+    "allowed": ["MIT", "ISC", "BSD-3-Clause"],
+    "denied": ["GPL-2.0", "GPL-3.0", "AGPL-3.0"]
+  }
+  ```
+  If a key is missing, treat it as no restriction for that list.
+- Return a list of failing dependencies with reason (`DENIED` or `NOT_ALLOWED`).
+- Treat `"UNKNOWN"` licenses as failing unless explicitly allowed.
+
+**Test Steps**:
+1. Create a policy file `policy.json` with `{ "allowed": ["MIT"] }`.
+2. Run:  
+   `licenseguard evaluate --policy ./policy.json --deps ./sample-deps.json`  
+   Where `sample-deps.json` contains:  
+   ```json
+   [{"name":"ok","version":"1.0","license":"MIT"},
+    {"name":"bad","version":"2.0","license":"GPL-3.0"}]
+   ```
+   Expected output (JSON):  
+   ```json
+   [{"name":"bad","version":"2.0","license":"GPL-3.0","reason":"DENIED"}]
+   ```
+
+### Feature 3: Reporting and Exit Code
+**Description**: Produce a human‑readable summary of scan results, highlight failing dependencies, and exit with code `0` on success or `1` on any failure. Optional JSON output for CI consumption.
+
+**Requirements**:
+- Default output: concise table showing PASS/FAIL counts and list of failures with reason.
+- With flag `--format json` output a JSON object containing `total`, `passed`, `failed`, and `details`.
+- Exit code `0` if `failed == 0`, otherwise `1`.
+- Respect `LICENSEGUARD_NO_COLOR` to disable ANSI colors.
+
+**Test Steps**:
+1. Run on a clean project with only MIT‑licensed deps:  
+   `licenseguard check`  
+   Expected output (excerpt):  
+   ```
+   ✅ All 12 dependencies are compliant with policy.
+   ```
+   Exit code: `0`
+2. Run on a project with one GPL‑3.0 dependency:  
+   `licenseguard check --format json`  
+   Expected JSON output:  
+   ```json
+   {
+     "total": 12,
+     "passed": 11,
+     "failed": 1,
+     "details": [
+       {"name":"problematic","version":"4.5.6","license":"GPL-3.0","reason":"DENIED"}
+     ]
+   }
+   ```
+   Exit code: `1`
+
+## Data Models
+```python
+from __future__ import annotations
+from typing import List, Optional
+from pydantic import BaseModel
+
+class Dependency(BaseModel):
+    name: str
+    version: str
+    license: str  # SPDX identifier or raw string; may be "UNKNOWN"
+
+class Policy(BaseModel):
+    allowed: Optional[List[str]] = None
+    denied: Optional[List[str]] = None
+
+    def is_allowed(self, lic: str) -> bool:
+        if self.denied and lic in self.denied:
+            return False
+        if self.allowed and lic not in self.allowed:
+            return False
+        return True
+```
+
+## File Structure
+```
+licenseguard/
+├─ __init__.py
+├─ cli.py              # click command group and subcommands
+├─ scanner.py          # Dependency license extraction
+├─ policy.py           # Policy loading and evaluation logic
+├─ models.py           # Dependency and Policy Pydantic models
+├─ reporter.py         # Formatting output and exit code handling
+├─ pyproject.toml      # Project metadata, dependencies (click, colorama)
+├─ README.md
+└─ tests/
+   ├─ __init__.py
+   ├─ test_scanner.py
+   ├─ test_policy.py
+   └─ test_reporter.py
+```
+*Total source files (excluding tests): 7.*
+
+## Success Criteria
+1. Running `licenseguard check` on a sample project with only MIT‑licensed dependencies prints a success message and exits with code `0`.
+2. Running the same command on a project containing a GPL‑3.0 dependency prints a failure report, lists the offending package, and exits with code `1`.
+3. Using `--format json` yields a parsable JSON object matching the schema defined in the reporter, suitable for CI ingestion.
+4. The tool works completely offline: no outbound network traffic is observed when run with `strace -e trace=network`.
+5. All unit tests pass (`pytest -q`) and achieve at least 90% line coverage.
+
+## Constraints & Notes
+- No external API calls – all data is read from the local filesystem (`node_modules` and policy file).
+- Target: a working minimum viable product achievable within **5** build iterations for the coding agent.
+- Prefer correctness over exhaustive feature coverage; the three core features above must be fully functional.
+- The tool is CLI‑only; no web UI or daemon is required.
+- Only the listed pip packages (`click`, `colorama`) may be installed; the rest relies on Python’s standard library.

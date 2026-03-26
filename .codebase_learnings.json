@@ -1,0 +1,38 @@
+{
+  "codebase_patterns": {
+    "framework": "Python 3.11+ CLI with click, pydantic, colorama, pytest",
+    "file_structure": {
+      "licenseguard/": "Main package (cli.py, scanner.py, policy.py, models.py, reporter.py)",
+      "tests/": "Test suite (test_scanner.py, test_policy.py, test_reporter.py)",
+      "sample-project/": "Test fixture with node_modules for manual testing"
+    },
+    "patterns": [
+      "Pydantic BaseModel for data modeling (Dependency, Policy)",
+      "Click command groups for CLI structure",
+      "pytest fixtures for temporary file structures",
+      "Deduplication by (name, version) tuple using Set[Tuple[str, str]]"
+    ],
+    "common_mistakes_to_avoid": [
+      "os.walk without followlinks=False creates symlink traversal vulnerabilities",
+      "Reading user-controlled files without size limits can cause memory exhaustion",
+      "npm packages can have license arrays for dual-licensing - handle them",
+      "Using 'except Exception' in library code hides bugs - be specific",
+      "Inconsistent error handling between modules confuses users"
+    ]
+  },
+  "security_notes": [
+    "Always use followlinks=False with os.walk on user directories",
+    "Check file size before reading user-controlled files",
+    "Use Path.resolve() to canonicalize paths",
+    "Specify UTF-8 encoding explicitly for file operations"
+  ],
+  "sessions": [
+    {
+      "session": 1,
+      "date": "2026-03-26",
+      "completed": ["Feature 1 - Dependency License Extraction (M2A-386)"],
+      "review_findings": "WARN - symlink traversal, no file size limit, missing license array handling",
+      "qa_result": "PASS - 19/19 tests, all edge cases verified"
+    }
+  ]
+}
